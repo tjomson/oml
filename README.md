@@ -38,6 +38,10 @@ It was necessary to install perl `sudo dnf install perl` to make vcpkg happy.
 
 Also, I had to run make as sudo
 
+To build for debugging, it was necessary to 
+
+`sudo dnf install libasan libubsan`
+
 ## Running the extension
 To run the extension code, simply start the shell with `./build/release/duckdb`.
 
