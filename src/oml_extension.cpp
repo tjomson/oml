@@ -13,6 +13,7 @@
 #include <fstream>
 #include <iostream>
 #include <openssl/opensslv.h>
+#include <regex>
 
 namespace duckdb {
 
@@ -25,23 +26,36 @@ struct OMLData : public GlobalTableFunctionState {
   bool finished = false;
 };
 
+std::vector<std::string> splitString(const std::string& input, const std::string& delimiterRegex) {
+  std::vector<std::string> result;
+  std::regex regex(delimiterRegex);
+  std::sregex_token_iterator iter(input.begin(), input.end(), regex, -1);
+  std::sregex_token_iterator end;
+
+  for (; iter != end; ++iter) {
+    result.push_back(iter->str());
+  }
+
+  return result;
+}
+
 static void InitTable(vector<LogicalType> &return_types, vector<string> &return_names) {
-  return_names.emplace_back("experiment_id");
-  return_types.emplace_back(LogicalType::VARCHAR);
-  return_names.emplace_back("node_id");
-  return_types.emplace_back(LogicalType::VARCHAR);
-  return_names.emplace_back("node_id_seq");
-  return_types.emplace_back(LogicalType::VARCHAR);
-  return_names.emplace_back("time_sec");
-  return_types.emplace_back(LogicalType::VARCHAR);
-  return_names.emplace_back("time_usec");
-  return_types.emplace_back(LogicalType::VARCHAR);
-  return_names.emplace_back("power");
-  return_types.emplace_back(LogicalType::FLOAT);
-  return_names.emplace_back("current");
-  return_types.emplace_back(LogicalType::FLOAT);
-  return_names.emplace_back("voltage");
-  return_types.emplace_back(LogicalType::FLOAT);
+  std::vector<std::tuple<std::string, LogicalType>> cols = {
+      {"experiment_id", LogicalType::VARCHAR},
+      {"node_id", LogicalType::VARCHAR},
+      {"node_id_seq", LogicalType::VARCHAR},
+      {"time-sec", LogicalType::VARCHAR},
+      {"time_usec", LogicalType::VARCHAR},
+      {"power", LogicalType::FLOAT},
+      {"current", LogicalType::FLOAT},
+      {"voltage", LogicalType::FLOAT}
+  };
+
+  for (auto col : cols) {
+    return_names.emplace_back(std::get<0>(col));
+    return_types.emplace_back(std::get<1>(col));
+
+  }
 }
 
 static unique_ptr<FunctionData> ReadOMLBind(ClientContext &context, TableFunctionBindInput &input,
@@ -57,34 +71,51 @@ unique_ptr<GlobalTableFunctionState> ReadOMLInit(ClientContext &context, TableFu
   return make_uniq<OMLData>();
 }
 
+static void AddRow(DataChunk &output, std::vector<string> &rowData, int index) {
+  for (int i = 0; i < 5; i++) {
+    output.SetValue(i, index, Value(rowData[i]));
+  }
+  for (int i = 5; i < 8; i++) {
+    output.SetValue(i, index, Value(std::stof(rowData[i])));
+  }
+}
+
 static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
   std::cout << "start oml function" << std::endl;
   auto &bind_data = data_p.bind_data->CastNoConst<OMLFunctionData>();
   auto &data = data_p.global_state->Cast<OMLData>();
   if (data.finished) return;
 //  output.Initialize(context, bind_data.return_types, 1);
-//  for (auto type :output.GetTypes()) {
-//    std::cout << type.ToString() << std::endl;
-//  }
-  for (int i = 0; i < 3; i++) {
-    output.SetValue(0, i, Value("hej0"+std::to_string(i)));
-    output.SetValue(1, i, Value("hej1"+std::to_string(i)));
-    output.SetValue(2, i, Value("hej2"+std::to_string(i)));
-    output.SetValue(3, i, Value("hej3"+std::to_string(i)));
-    output.SetValue(4, i, Value("hej4"+std::to_string(i)));
-    output.SetValue(5, i, Value(0.1 + i));
-    output.SetValue(6, i, Value(0.2 + i));
-    output.SetValue(7, i, Value(0.3 + i));
-  }
-  output.SetCardinality(3);
-  data.finished = true;
 
-//  string line;
-//  std::ifstream file(bind_data.file);
-//  while (getline (file, line)) {
-////    std::cout << line << std::endl;
-//  }
-//  file.close();
+  int rowCount = 0;
+
+  string line;
+  std::ifstream file(bind_data.file);
+  bool dataStarted = false;
+  while (getline (file, line)) {
+    if (line == "") {
+      dataStarted = true;
+      continue;
+    }
+    if (!dataStarted) continue;
+    auto parts = splitString(line, "\\s+");
+    if (parts.size() != 8) continue;
+
+//    std::cout << line << std::endl;
+//    std::cout << "before AddRow" << std::endl;
+    for (auto part : parts) std::cout << part << "-";
+    AddRow(output, parts, rowCount);
+//    std::cout << "after AddRow" << std::endl;
+    rowCount++;
+    std::cout << std::endl;
+//    std::cout << parts.size() << std::endl;
+//    std::cout << line << std::endl;
+  }
+  output.SetCardinality(rowCount);
+  std::cout << output.ToString() << std::endl;
+  std::cout << "row count: " << rowCount << std::endl;
+  file.close();
+  data.finished = true;
 }
 
 static void LoadInternal(DatabaseInstance &instance) {
