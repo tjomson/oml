@@ -25,23 +25,6 @@ struct OMLData : public GlobalTableFunctionState {
   bool finished = false;
 };
 
-//struct OMLLocalstate : public LocalTableFunctionState {
-//public:
-//  explicit OMLLocalstate() : bytes_read(0), total_size(0), current_progress(0), file_index(0) {
-//  }
-//
-//  //! The CSV reader
-//  unique_ptr<BufferedCSVReader> csv_reader;
-//  //! The current amount of bytes read by this reader
-//  idx_t bytes_read;
-//  //! The total amount of bytes in the file
-//  idx_t total_size;
-//  //! The current progress from 0..100
-//  idx_t current_progress;
-//  //! The file index of this reader
-//  idx_t file_index;
-//};
-
 static void InitTable(vector<LogicalType> &return_types, vector<string> &return_names) {
   return_names.emplace_back("experiment_id");
   return_types.emplace_back(LogicalType::VARCHAR);
@@ -80,9 +63,6 @@ static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, 
   auto &data = data_p.global_state->Cast<OMLData>();
   if (data.finished) return;
 //  output.Initialize(context, bind_data.return_types, 1);
-//  auto &data = data_p.global_state->Cast<GlobalTableFunctionState>();
-//  auto &lstate = data_p.local_state->Cast<LocalTableFunctionState>();
-//  std::cout << "lmao " << bind_data.file << std::endl;
 //  for (auto type :output.GetTypes()) {
 //    std::cout << type.ToString() << std::endl;
 //  }
@@ -99,9 +79,6 @@ static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, 
   output.SetCardinality(3);
   data.finished = true;
 
-//  std::cout << output.ToString() << std::endl;
-
-
 //  string line;
 //  std::ifstream file(bind_data.file);
 //  while (getline (file, line)) {
@@ -110,37 +87,10 @@ static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, 
 //  file.close();
 }
 
-//inline void OmlScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
-//  auto &name_vector = args.data[0];
-//    UnaryExecutor::Execute<string_t, string_t>(
-//	    name_vector, result, args.size(),
-//	    [&](string_t name) {
-//			return StringVector::AddString(result, "Omqweqel12 "+name.GetString()+" 🐥hahweha");
-//        });
-//}
-//
-//inline void OmlOpenSSLVersionScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
-//    auto &name_vector = args.data[0];
-//    UnaryExecutor::Execute<string_t, string_t>(
-//	    name_vector, result, args.size(),
-//	    [&](string_t name) {
-//			return StringVector::AddString(result, "Oml " + name.GetString() +
-//                                                     ", my linked OpenSSL version is " +
-//                                                     OPENSSL_VERSION_TEXT );;
-//        });
-//}
-
 static void LoadInternal(DatabaseInstance &instance) {
     // Register a scalar function
-//    auto oml_scalar_function = ScalarFunction("oml", {LogicalType::VARCHAR}, LogicalType::VARCHAR, OmlScalarFun);
-//    ExtensionUtil::RegisterFunction(instance, oml_scalar_function);
     TableFunction read_oml("read_oml", {LogicalType::VARCHAR}, ReadOMLFunction, ReadOMLBind, ReadOMLInit);
     ExtensionUtil::RegisterFunction(instance, read_oml);
-
-    // Register another scalar function
-//    auto oml_openssl_version_scalar_function = ScalarFunction("oml_openssl_version", {LogicalType::VARCHAR},
-//                                                LogicalType::VARCHAR, OmlOpenSSLVersionScalarFun);
-//    ExtensionUtil::RegisterFunction(instance, oml_openssl_version_scalar_function);
 }
 
 void OmlExtension::Load(DuckDB &db) {
