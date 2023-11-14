@@ -26,26 +26,10 @@ struct OMLData : public GlobalTableFunctionState {
   bool finished = false;
 };
 
-std::vector<std::string> splitString(const std::string& input, const std::string& delimiterRegex) {
-  std::vector<std::string> result;
-  std::regex regex(delimiterRegex);
-  std::sregex_token_iterator iter(input.begin(), input.end(), regex, -1);
-  std::sregex_token_iterator end;
-
-  for (; iter != end; ++iter) {
-    result.push_back(iter->str());
-  }
-
-  return result;
-}
-
 static void InitTable(vector<LogicalType> &return_types, vector<string> &return_names) {
   std::vector<std::tuple<std::string, LogicalType>> cols = {
-      {"experiment_id", LogicalType::VARCHAR},
-      {"node_id", LogicalType::VARCHAR},
-      {"node_id_seq", LogicalType::VARCHAR},
-      {"time_sec", LogicalType::VARCHAR},
-      {"time_usec", LogicalType::VARCHAR},
+      {"id", LogicalType::INTEGER},
+      {"ts", LogicalType::FLOAT},
       {"power", LogicalType::FLOAT},
       {"current", LogicalType::FLOAT},
       {"voltage", LogicalType::FLOAT}
@@ -63,7 +47,6 @@ static unique_ptr<FunctionData> ReadOMLBind(ClientContext &context, TableFunctio
   auto result = make_uniq<OMLFunctionData>();
   result->file = StringValue::Get(input.inputs[0]);
   InitTable(return_types, return_names);
-  std::cout << "bind done " << input.inputs[0] << std::endl;
   return std::move(result);
 }
 
@@ -71,13 +54,13 @@ unique_ptr<GlobalTableFunctionState> ReadOMLInit(ClientContext &context, TableFu
   return make_uniq<OMLData>();
 }
 
-static void AddRow(DataChunk &output, std::vector<string> &rowData, int index) {
-  for (int i = 0; i < 5; i++) {
-    output.SetValue(i, index, Value(rowData[i]));
-  }
-  for (int i = 5; i < 8; i++) {
-    output.SetValue(i, index, Value(std::stof(rowData[i])));
-  }
+static void AddRow(DataChunk &output, std::vector<string> &rowData, int &rowIndex) {
+  output.SetValue(0, rowIndex, Value(rowIndex));
+  output.SetValue(1, rowIndex, Value(std::stof(rowData[3]) + std::stof(rowData[4])));
+  output.SetValue(2, rowIndex, Value(std::stof(rowData[5])));
+  output.SetValue(3, rowIndex, Value(std::stof(rowData[6])));
+  output.SetValue(4, rowIndex, Value(std::stof(rowData[7])));
+  rowIndex++;
 }
 
 static LogicalType convertToLogicalType(std::string &type) {
@@ -96,9 +79,9 @@ static unique_ptr<FunctionData> OmlGenBind(ClientContext &context, TableFunction
   for (int i = 0; i < 7; i++) {
     getline (file, line);
   }
-  auto split = splitString(line, "\\s+");
+  auto split = StringUtil::Split(line, "\t");
   for (ulong i = 3; i < split.size(); i++) {
-    auto name_type = splitString(split[i], ":");
+    auto name_type = StringUtil::Split(split[i], ":");
     return_names.emplace_back(name_type[0]);
     return_types.emplace_back(convertToLogicalType(name_type[1]));
   }
@@ -121,7 +104,7 @@ static void OmlGenFunction(ClientContext &context, TableFunctionInput &data_p, D
       continue;
     }
     if (!dataStarted) continue;
-    auto parts = splitString(line, "\\s+");
+    auto parts = StringUtil::Split(line, "\t");
     for (auto part : parts) std::cout << part << " - ";
     std::cout << std::endl;
     if (parts.size() != 8) continue;
@@ -138,7 +121,6 @@ static void OmlGenFunction(ClientContext &context, TableFunctionInput &data_p, D
 }
 
 static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
-  std::cout << "start oml function" << std::endl;
   auto &bind_data = data_p.bind_data->CastNoConst<OMLFunctionData>();
   auto &data = data_p.global_state->Cast<OMLData>();
   if (data.finished) return;
@@ -155,11 +137,10 @@ static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, 
       continue;
     }
     if (!dataStarted) continue;
-    auto parts = splitString(line, "\\s+");
+    auto parts = StringUtil::Split(line, "\t");
     if (parts.size() != 8) continue;
 
     AddRow(output, parts, rowCount);
-    rowCount++;
   }
   output.SetCardinality(rowCount);
   std::cout << output.ToString() << std::endl;
