@@ -24,6 +24,7 @@ struct OMLFunctionData : public TableFunctionData {
 
 struct OMLData : public GlobalTableFunctionState {
   bool finished = false;
+  int tuples_read = 0;
 };
 
 std::vector<std::string> splitString(const std::string& input, const std::string& delimiterRegex) {
@@ -84,36 +85,36 @@ static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, 
   std::cout << "start oml function" << std::endl;
   auto &bind_data = data_p.bind_data->CastNoConst<OMLFunctionData>();
   auto &data = data_p.global_state->Cast<OMLData>();
-  if (data.finished) return;
+//  if (data.finished) return;
 //  output.Initialize(context, bind_data.return_types, 1);
-
-  int rowCount = 0;
 
   string line;
   std::ifstream file(bind_data.file);
   bool dataStarted = false;
+  int index = 0;
+  int startIndex = data.tuples_read;
   while (getline (file, line)) {
     if (line == "") {
       dataStarted = true;
       continue;
     }
     if (!dataStarted) continue;
+    if (index < startIndex) {
+      index++;
+      continue;
+    }
+    if (index > startIndex + 1000) return;
     auto parts = splitString(line, "\\s+");
     if (parts.size() != 8) continue;
 
-//    std::cout << line << std::endl;
-//    std::cout << "before AddRow" << std::endl;
     for (auto part : parts) std::cout << part << "-";
-    AddRow(output, parts, rowCount);
-//    std::cout << "after AddRow" << std::endl;
-    rowCount++;
+    AddRow(output, parts, data.tuples_read);
+    data.tuples_read++;
     std::cout << std::endl;
-//    std::cout << parts.size() << std::endl;
-//    std::cout << line << std::endl;
   }
-  output.SetCardinality(rowCount);
+  output.SetCardinality(data.tuples_read);
   std::cout << output.ToString() << std::endl;
-  std::cout << "row count: " << rowCount << std::endl;
+  std::cout << "row count: " << data.tuples_read << std::endl;
   file.close();
   data.finished = true;
 }
