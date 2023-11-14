@@ -44,7 +44,7 @@ static void InitTable(vector<LogicalType> &return_types, vector<string> &return_
       {"experiment_id", LogicalType::VARCHAR},
       {"node_id", LogicalType::VARCHAR},
       {"node_id_seq", LogicalType::VARCHAR},
-      {"time-sec", LogicalType::VARCHAR},
+      {"time_sec", LogicalType::VARCHAR},
       {"time_usec", LogicalType::VARCHAR},
       {"power", LogicalType::FLOAT},
       {"current", LogicalType::FLOAT},
@@ -80,6 +80,63 @@ static void AddRow(DataChunk &output, std::vector<string> &rowData, int index) {
   }
 }
 
+static LogicalType convertToLogicalType(std::string &type) {
+  if (type == "uint32") return LogicalType::UINTEGER;
+  if (type == "double") return LogicalType::DOUBLE;
+  if (type == "string") return LogicalType::VARCHAR;
+  throw ExceptionFormatValue("Unknown type: " + type);
+}
+
+static unique_ptr<FunctionData> OmlGenBind(ClientContext &context, TableFunctionBindInput &input,
+                                            vector<LogicalType> &return_types, vector<string> &return_names) {
+  auto result = make_uniq<OMLFunctionData>();
+  result->file = StringValue::Get(input.inputs[0]);
+  string line;
+  std::ifstream file(result->file);
+  for (int i = 0; i < 7; i++) {
+    getline (file, line);
+  }
+  auto split = splitString(line, "\\s+");
+  for (ulong i = 3; i < split.size(); i++) {
+    auto name_type = splitString(split[i], ":");
+    return_names.emplace_back(name_type[0]);
+    return_types.emplace_back(convertToLogicalType(name_type[1]));
+  }
+  return std::move(result);
+}
+
+static void OmlGenFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
+  auto &bind_data = data_p.bind_data->CastNoConst<OMLFunctionData>();
+  auto &data = data_p.global_state->Cast<OMLData>();
+  if (data.finished) return;
+
+  int rowCount = 0;
+
+  string line;
+  std::ifstream file(bind_data.file);
+  bool dataStarted = false;
+  while (getline (file, line)) {
+    if (line == "") {
+      dataStarted = true;
+      continue;
+    }
+    if (!dataStarted) continue;
+    auto parts = splitString(line, "\\s+");
+    for (auto part : parts) std::cout << part << " - ";
+    std::cout << std::endl;
+    if (parts.size() != 8) continue;
+    for (ulong i = 3; i < parts.size(); i++) {
+      output.SetValue(i - 3, rowCount, Value(parts[i]));
+    }
+    rowCount++;
+  }
+  output.SetCardinality(rowCount);
+  std::cout << output.ToString() << std::endl;
+  std::cout << "row count: " << rowCount << std::endl;
+  file.close();
+  data.finished = true;
+}
+
 static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
   std::cout << "start oml function" << std::endl;
   auto &bind_data = data_p.bind_data->CastNoConst<OMLFunctionData>();
@@ -101,15 +158,8 @@ static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, 
     auto parts = splitString(line, "\\s+");
     if (parts.size() != 8) continue;
 
-//    std::cout << line << std::endl;
-//    std::cout << "before AddRow" << std::endl;
-    for (auto part : parts) std::cout << part << "-";
     AddRow(output, parts, rowCount);
-//    std::cout << "after AddRow" << std::endl;
     rowCount++;
-    std::cout << std::endl;
-//    std::cout << parts.size() << std::endl;
-//    std::cout << line << std::endl;
   }
   output.SetCardinality(rowCount);
   std::cout << output.ToString() << std::endl;
@@ -122,6 +172,8 @@ static void LoadInternal(DatabaseInstance &instance) {
     // Register a scalar function
     TableFunction read_oml("read_oml", {LogicalType::VARCHAR}, ReadOMLFunction, ReadOMLBind, ReadOMLInit);
     ExtensionUtil::RegisterFunction(instance, read_oml);
+    TableFunction oml_gen("oml_gen", {LogicalType::VARCHAR}, OmlGenFunction, OmlGenBind, ReadOMLInit);
+    ExtensionUtil::RegisterFunction(instance, oml_gen);
 }
 
 void OmlExtension::Load(DuckDB &db) {
