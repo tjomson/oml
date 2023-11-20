@@ -42,6 +42,13 @@ To build for debugging, it was necessary to
 
 `sudo dnf install libasan libubsan`
 
+To build for debugging, run make with sudo and singlethreaded, otherwise it runs out of memory.
+
+To enable debugging in Clion:
+- Set build target to `../build/debug`
+- Edit the configuration to point to the binary in /build/debug
+- Check the box `Run with root priviledges`
+
 ## Running the extension
 To run the extension code, simply start the shell with `./build/release/duckdb`.
 
