@@ -1,0 +1,11 @@
+# name: test/sql/oml.test
+# description: test oml extension
+# group: [oml]
+
+require oml
+
+statement error
+from read_oml('./oml-files/invalid-columns.oml');
+----
+Invalid Input Error: Invalid column count in oml file: 7
+

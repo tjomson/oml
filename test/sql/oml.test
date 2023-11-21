@@ -3,21 +3,31 @@
 # group: [oml]
 
 # Before we load the extension, this will fail
-statement error
-SELECT oml('Sam');
-----
-Catalog Error: Scalar Function with name oml does not exist!
+#statement error
+#from read_oml('foo') limit 7;
+#----
+#Catalog Error: Table Function with name read_oml does not exist!
 
 # Require statement will ensure this test is run with this extension loaded
-require oml
+#require oml
+#
+#statement error
+#from read_oml('./oml-files/invalid-columns.oml');
+#----
+#Error: Invalid Input Error: Invalid column count in oml file: 7
 
 # Confirm the extension works
-query I
-SELECT oml('Sam');
-----
-Oml Sam 🐥
-
-query I
-SELECT oml_openssl_version('Michael');
-----
-<REGEX>:Oml Michael, my linked OpenSSL version is OpenSSL.*
+#query I
+#from read_oml('./oml-files/smol.oml') limit 7;
+#----
+#0   1697923200.0    0.283869    4.87    0.058263
+#1   1697927800.0    0.283259    4.87125 0.058239
+#2   1697932300.0    0.283259    4.86875 0.058239
+#3   1697936800.0    0.283869    4.86875 0.058312
+#4   1697941200.0    0.283869    4.87    0.058361
+#5   1697945900.0    0.283869    4.87    0.058312
+#6   1697950300.0    0.283259    4.87    0.058166
+#query I
+#SELECT oml_openssl_version('Michael');
+#----
+#<REGEX>:Oml Michael, my linked OpenSSL version is OpenSSL.*
