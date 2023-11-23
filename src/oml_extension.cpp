@@ -24,6 +24,7 @@ struct OMLFunctionData : public TableFunctionData {
 
 struct OMLData : public GlobalTableFunctionState {
   bool finished = false;
+  int linesRead = 0;
 };
 
 static void InitTable(vector<LogicalType> &return_types, vector<string> &return_names) {
@@ -54,8 +55,8 @@ unique_ptr<GlobalTableFunctionState> ReadOMLInit(ClientContext &context, TableFu
   return make_uniq<OMLData>();
 }
 
-static void AddRow(DataChunk &output, std::vector<string> &rowData, int &rowIndex) {
-  output.SetValue(0, rowIndex, Value(rowIndex));
+static void AddRow(DataChunk &output, std::vector<string> &rowData, int &rowIndex, int priorLinesRead) {
+  output.SetValue(0, rowIndex, Value(priorLinesRead + rowIndex));
   output.SetValue(1, rowIndex, Value(std::stof(rowData[3]) + std::stof(rowData[4])));
   output.SetValue(2, rowIndex, Value(std::stof(rowData[5])));
   output.SetValue(3, rowIndex, Value(std::stof(rowData[6])));
@@ -120,7 +121,20 @@ static void OmlGenFunction(ClientContext &context, TableFunctionInput &data_p, D
   data.finished = true;
 }
 
+static void SkipHeader(std::basic_ifstream<char> &file, string &line) {
+  while (getline (file, line)) {
+    if (line.empty()) return;
+  }
+}
+
+static void SkipAlreadyRead(std::basic_ifstream<char> &file, string &line, int linesRead) {
+  for (int i = 0; i < linesRead; i++) {
+    getline(file, line);
+  }
+}
+
 static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
+  auto linesPerRun = 1000;
   auto &bind_data = data_p.bind_data->CastNoConst<OMLFunctionData>();
   auto &data = data_p.global_state->Cast<OMLData>();
   if (data.finished) return;
@@ -130,23 +144,22 @@ static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, 
 
   string line;
   std::ifstream file(bind_data.file);
-  bool dataStarted = false;
-  while (getline (file, line)) {
-    if (line == "") {
-      dataStarted = true;
-      continue;
+  SkipHeader(file, line);
+  SkipAlreadyRead(file, line, data.linesRead);
+
+
+  for (int i = 0; i < linesPerRun; i++) {
+    if (!getline (file, line)) {
+      data.finished = true;
+      break;
     }
-    if (!dataStarted) continue;
     auto parts = StringUtil::Split(line, "\t");
     if (parts.size() != 8) continue;
-
-    AddRow(output, parts, rowCount);
+    AddRow(output, parts, rowCount, data.linesRead);
   }
+  data.linesRead += rowCount;
   output.SetCardinality(rowCount);
-  std::cout << output.ToString() << std::endl;
-  std::cout << "row count: " << rowCount << std::endl;
   file.close();
-  data.finished = true;
 }
 
 static void LoadInternal(DatabaseInstance &instance) {
