@@ -79,7 +79,7 @@ static unique_ptr<FunctionData> OmlGenBind(ClientContext &context, TableFunction
   for (int i = 0; i < 7; i++) {
     getline (file, line);
   }
-  auto split = StringUtil::Split(line, "\t");
+  auto split = StringUtil::Split(line, " ");
   for (ulong i = 3; i < split.size(); i++) {
     auto name_type = StringUtil::Split(split[i], ":");
     return_names.emplace_back(name_type[0]);
