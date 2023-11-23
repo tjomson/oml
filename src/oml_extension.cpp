@@ -64,6 +64,18 @@ static void AddRow(DataChunk &output, std::vector<string> &rowData, int &rowInde
   rowIndex++;
 }
 
+static void SkipHeader(std::basic_ifstream<char> &file, string &line) {
+  while (getline (file, line)) {
+    if (line.empty()) return;
+  }
+}
+
+static void SkipAlreadyRead(std::basic_ifstream<char> &file, string &line, int linesRead) {
+  for (int i = 0; i < linesRead; i++) {
+    getline(file, line);
+  }
+}
+
 static LogicalType convertToLogicalType(std::string &type) {
   if (type == "uint32") return LogicalType::UINTEGER;
   if (type == "double") return LogicalType::DOUBLE;
@@ -90,6 +102,7 @@ static unique_ptr<FunctionData> OmlGenBind(ClientContext &context, TableFunction
 }
 
 static void OmlGenFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
+  auto linesPerRun = 1000;
   auto &bind_data = data_p.bind_data->CastNoConst<OMLFunctionData>();
   auto &data = data_p.global_state->Cast<OMLData>();
   if (data.finished) return;
@@ -98,39 +111,24 @@ static void OmlGenFunction(ClientContext &context, TableFunctionInput &data_p, D
 
   string line;
   std::ifstream file(bind_data.file);
-  bool dataStarted = false;
-  while (getline (file, line)) {
-    if (line == "") {
-      dataStarted = true;
-      continue;
+  SkipHeader(file, line);
+  SkipAlreadyRead(file, line, data.linesRead);
+
+  for (int i = 0; i < linesPerRun; i++) {
+    if (!getline (file, line)) {
+      data.finished = true;
+      break;
     }
-    if (!dataStarted) continue;
     auto parts = StringUtil::Split(line, "\t");
-    for (auto part : parts) std::cout << part << " - ";
-    std::cout << std::endl;
-    if (parts.size() != 8) continue;
-    for (ulong i = 3; i < parts.size(); i++) {
-      output.SetValue(i - 3, rowCount, Value(parts[i]));
+    for (ulong j = 3; j < parts.size(); j++) {
+      output.SetValue(j - 3, rowCount, Value(parts[j]));
     }
     rowCount++;
   }
+
+  data.linesRead += rowCount;
   output.SetCardinality(rowCount);
-  std::cout << output.ToString() << std::endl;
-  std::cout << "row count: " << rowCount << std::endl;
   file.close();
-  data.finished = true;
-}
-
-static void SkipHeader(std::basic_ifstream<char> &file, string &line) {
-  while (getline (file, line)) {
-    if (line.empty()) return;
-  }
-}
-
-static void SkipAlreadyRead(std::basic_ifstream<char> &file, string &line, int linesRead) {
-  for (int i = 0; i < linesRead; i++) {
-    getline(file, line);
-  }
 }
 
 static void ReadOMLFunction(ClientContext &context, TableFunctionInput &data_p, DataChunk &output) {
