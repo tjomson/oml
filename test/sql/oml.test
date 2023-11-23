@@ -3,31 +3,53 @@
 # group: [oml]
 
 # Before we load the extension, this will fail
-#statement error
-#from read_oml('foo') limit 7;
-#----
-#Catalog Error: Table Function with name read_oml does not exist!
+statement error
+from read_oml('foo');
+----
+Catalog Error: Table Function with name read_oml does not exist!
+
+statement error
+from oml_gen('foo');
+----
+Catalog Error: Table Function with name oml_gen does not exist!
 
 # Require statement will ensure this test is run with this extension loaded
-#require oml
-#
-#statement error
-#from read_oml('./oml-files/invalid-columns.oml');
-#----
-#Error: Invalid Input Error: Invalid column count in oml file: 7
+require oml
 
-# Confirm the extension works
-#query I
-#from read_oml('./oml-files/smol.oml') limit 7;
-#----
-#0   1697923200.0    0.283869    4.87    0.058263
-#1   1697927800.0    0.283259    4.87125 0.058239
-#2   1697932300.0    0.283259    4.86875 0.058239
-#3   1697936800.0    0.283869    4.86875 0.058312
-#4   1697941200.0    0.283869    4.87    0.058361
-#5   1697945900.0    0.283869    4.87    0.058312
-#6   1697950300.0    0.283259    4.87    0.058166
-#query I
-#SELECT oml_openssl_version('Michael');
-#----
-#<REGEX>:Oml Michael, my linked OpenSSL version is OpenSSL.*
+statement ok
+create table readoml as select * from read_oml('./oml-files/st_lrwan1_11.oml');
+
+statement ok
+create table omlgen as select * from oml_gen('./oml-files/st_lrwan1_11.oml');
+
+query I
+select count(*) from readoml;
+----
+67725
+
+query I
+select count(*) from omlgen;
+----
+67725
+
+query IIIII
+from readoml limit 7;
+----
+0	1697923200.0	0.283869	4.87	0.058263
+1	1697927800.0	0.283259	4.87125	0.058239
+2	1697932300.0	0.283259	4.86875	0.058239
+3	1697936800.0	0.283869	4.86875	0.058312
+4	1697941200.0	0.283869	4.87	0.058361
+5	1697945900.0	0.283869	4.87	0.058312
+6	1697950300.0	0.283259	4.87	0.058166
+
+query IIIII
+from omlgen limit 7;
+----
+1697457735	465462	0.283869	4.87	0.058263
+1697457735	469978	0.283259	4.87125	0.058239
+1697457735	474494	0.283259	4.86875	0.058239
+1697457735	478980	0.283869	4.86875	0.058312
+1697457735	483496	0.283869	4.87	0.058361
+1697457735	488012	0.283869	4.87	0.058312
+1697457735	492528	0.283259	4.87	0.058166
