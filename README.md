@@ -1,4 +1,29 @@
-# Quack
+# OML extension
+
+Extension to DuckDB that allows reading of [OML files](https://iot-lab.github.io/docs/tools/consumption-monitoring/).
+
+See [oml_extension.cpp](./src/oml_extension.cpp)
+
+Part of Advaced Data Systems course, fall 2023.
+
+## Additional notes on building
+
+It was necessary to install perl `sudo dnf install perl` to make vcpkg happy.
+
+Also, I had to run make as sudo
+
+To build for debugging, it was necessary to
+
+`sudo dnf install libasan libubsan`
+
+To build for debugging, run make with sudo and singlethreaded, otherwise it runs out of memory.
+
+To enable debugging in Clion:
+- Set build target to `../build/debug`
+- Edit the configuration to point to the binary in /build/debug
+- Check the box `Run with root priviledges`
+
+## Quack
 
 This repository is based on https://github.com/duckdb/extension-template, check it out if you want to build and ship your own DuckDB extension.
 
@@ -31,23 +56,6 @@ The main binaries that will be built are:
 - `duckdb` is the binary for the duckdb shell with the extension code automatically loaded.
 - `unittest` is the test runner of duckdb. Again, the extension is already linked into the binary.
 - `oml.duckdb_extension` is the loadable binary as it would be distributed.
-
-**Note from tjoms:**
-
-It was necessary to install perl `sudo dnf install perl` to make vcpkg happy.
-
-Also, I had to run make as sudo
-
-To build for debugging, it was necessary to 
-
-`sudo dnf install libasan libubsan`
-
-To build for debugging, run make with sudo and singlethreaded, otherwise it runs out of memory.
-
-To enable debugging in Clion:
-- Set build target to `../build/debug`
-- Edit the configuration to point to the binary in /build/debug
-- Check the box `Run with root priviledges`
 
 ## Running the extension
 To run the extension code, simply start the shell with `./build/release/duckdb`.
