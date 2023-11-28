@@ -80,6 +80,7 @@ static LogicalType convertToLogicalType(std::string &type) {
   if (type == "uint32") return LogicalType::UINTEGER;
   if (type == "double") return LogicalType::DOUBLE;
   if (type == "string") return LogicalType::VARCHAR;
+  if (type == "int32") return LogicalType::INTEGER;
   throw ExceptionFormatValue("Unknown type: " + type);
 }
 
